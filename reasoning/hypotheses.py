@@ -36,13 +36,23 @@ and tracked as an exponentially weighted average of the surprise -log P.
 When the average surprise stays high, none of the four explanations fits the
 data and the controller switches to conservative decisions.
 
-All likelihood numbers are explicit (see the tables below). The normal (N) row
-and the congestion change rate were calibrated on simulated days that are not
-used for testing (experiments/calibrate.py); the other entries are stated
-assumptions that encode the definitions above. They are meant to be read,
-questioned and changed.
+All likelihood numbers are explicit (see the tables below). The default values
+are hand-set assumptions. If reasoning/likelihoods.json exists (written by
+experiments/calibrate.py), the N, C, F and A rows are replaced by values
+estimated on calibration days (seeds 101-102) of the *training* situations
+only: normal, congestion, fault, and the two "all plugs free" attacks. The
+stealthy attacks and the charger outage are never used for calibration, so the
+test on them checks whether the model transfers to situations it has not seen.
+
+A verification (phone call, station camera, a fleet vehicle nearby) is an
+imperfect observation Y of the same discrepancy: it is right with probability
+VERIFY_ACCURACY and otherwise uninformative,
+
+    P(Y = y | k) = q * P_DISC[k][y] + (1 - q) / 3.
 """
+import json
 import math
+import os
 
 HYPS = ("N", "C", "F", "A")
 
@@ -70,6 +80,17 @@ P_JAMMED = {"N": 0.01, "C": 0.05, "F": 0.05, "A": 0.50}
 # N calibrated: 0.62. C calibrated at the congested station: 0.62.
 P_CHANGED = {"N": 0.62, "C": 0.62, "F": 0.05, "A": 0.05}
 
+VERIFY_ACCURACY = 0.8   # probability that a verification returns the true availability
+
+# Replace the hand-set rows by calibrated ones when experiments/calibrate.py has run.
+CALIBRATED = False
+_cal = os.path.join(os.path.dirname(os.path.abspath(__file__)), "likelihoods.json")
+if os.path.exists(_cal) and os.environ.get("HAND_SET_LIKELIHOODS") != "1":
+    _c = json.load(open(_cal))
+    P_DISC = {k: tuple(v) for k, v in _c["P_DISC"].items()}
+    P_EXTREME, P_JAMMED, P_CHANGED = _c["P_EXTREME"], _c["P_JAMMED"], _c["P_CHANGED"]
+    CALIBRATED = True
+
 PRIOR = {"N": 0.90, "C": 0.05, "F": 0.03, "A": 0.02}
 STAY = 0.995          # per-minute probability that the explanation stays the same
 
@@ -81,6 +102,11 @@ def disc_bin(d):
 def arrival_likelihood(reported_avail, observed_avail, report_extreme):
     d = disc_bin(reported_avail - observed_avail)
     return {k: P_DISC[k][d] * (P_EXTREME[k] if report_extreme else 1 - P_EXTREME[k]) for k in HYPS}
+
+
+def verify_likelihood(y_bin, q=VERIFY_ACCURACY):
+    """P(verification result falls in discrepancy bin y | hypothesis)."""
+    return {k: q * P_DISC[k][y_bin] + (1 - q) / 3 for k in HYPS}
 
 
 def stream_likelihood(changed, jammed):
@@ -117,6 +143,9 @@ class StationBelief:
 
     def observe_stream(self, changed, jammed=False):
         return self._update(stream_likelihood(changed, jammed))
+
+    def observe_verification(self, reported_avail, observed_avail):
+        return self._update(verify_likelihood(disc_bin(reported_avail - observed_avail)))
 
     # -- summaries ------------------------------------------------------------
     def reliable(self):

@@ -19,12 +19,16 @@ Controllers
                   reports after the alarm
     Reasoning     the proposed method: per-station multi-hypothesis filter,
                   inadequacy check, expected-cost decisions over explanations,
-                  battery-aware risk, hedging, and value-of-information
-                  verification
+                  battery-aware risk, hedging, and a value-of-perfect-information
+                  (EVPI) check for one taxi (in practice it never asks)
+    Reasoning+EVSI  the same, but verification is decided by the expected
+                  value of *sample* information of an imperfect check, counted
+                  for every taxi that will use the answer (decision-aware
+                  verification)
 """
 import math
 
-from .hypotheses import HYPS, StationBelief
+from .hypotheses import HYPS, StationBelief, verify_likelihood
 from .network import NetworkBelief, StationView
 
 
@@ -63,7 +67,7 @@ class Base:
     def on_minute(self, now, reports):
         self.reports = reports
 
-    def on_observation(self, j, reported_avail, observed_avail, extreme, now):
+    def on_observation(self, j, reported_avail, observed_avail, extreme, now, verified=False):
         pass
 
     def diagnosis(self):
@@ -96,7 +100,7 @@ class Threshold(_DistrustAfterAlarm):
         super().__init__(plugs, **kw)
         self.k, self.window, self.times = k, window_s, []
 
-    def on_observation(self, j, rep, obs, extreme, now):
+    def on_observation(self, j, rep, obs, extreme, now, verified=False):
         if rep - obs >= 2 and self.alarm_time is None:
             self.times = [t for t in self.times if now - t <= self.window] + [now]
             if len(self.times) >= self.k:
@@ -113,7 +117,7 @@ class Cusum(_DistrustAfterAlarm):
         self.l0 = math.log((1 - p1) / (1 - p0))
         self.h, self.S = h, 0.0
 
-    def on_observation(self, j, rep, obs, extreme, now):
+    def on_observation(self, j, rep, obs, extreme, now, verified=False):
         x = 1 if rep - obs >= 1 else 0
         self.S = max(0.0, self.S + (self.l1 if x else self.l0))
         if self.S > self.h and self.alarm_time is None:
@@ -128,11 +132,15 @@ class Reasoning(Base):
       wait under each explanation
         W_j(N) = wait(reported availability)
         W_j(C) = wait(reported availability) + congestion margin
-        W_j(F) = W_j(A) = wait(fleet's own estimate) + uncertainty penalty
+        W_j(A) = wait(fleet's own estimate) + uncertainty penalty
+        W_j(F) = like W_j(A), but the equipment may be partly down: with
+                 probability p_cap_loss, 0..plugs-1 plugs work (0 working =
+                 drive on elsewhere, `reroute_min`)
 
       expected cost      E_j = travel_j + sum_k b_j(k) W_j(k)
-      battery-aware risk R_j = E_j + lambda(SOC) * (max_k W_j(k) - sum_k b_j(k) W_j(k))
-                         (a nearly empty taxi cannot afford to be wrong)
+      battery-aware risk R_j = E_j + lambda(SOC) * sd_j,  sd_j = standard deviation
+                         of W_j(k) under the belief (a nearly empty taxi cannot
+                         afford to be wrong; an unlikely explanation adds little)
       inadequacy         if no explanation fits station j (high surprise),
                          use the conservative wait max_k W_j(k)
       hedging            if j is probably unreliable (P(N)+P(C) < 0.5), do not
@@ -149,8 +157,10 @@ class Reasoning(Base):
 
     def __init__(self, plugs, congestion_margin=3.0, uncertainty_pen=5.0, risk_low=1.0, risk_high=0.3,
                  low_soc=0.2, hedge_cap=2, verify_min=3.0, verify_cooldown_s=900,
-                 inadequacy_threshold=2.0, alarm_p=0.7, network=True, **kw):
+                 inadequacy_threshold=2.0, alarm_p=0.7, network=True, capacity_risk=True,
+                 p_cap_loss=0.5, reroute_min=15.0, **kw):
         super().__init__(plugs, **kw)
+        self.capacity_risk, self.p_cap_loss, self.reroute_min = capacity_risk, p_cap_loss, reroute_min
         self.network = network
         self.net = None
         self.cm, self.up = congestion_margin, uncertainty_pen
@@ -163,6 +173,9 @@ class Reasoning(Base):
         self.last_verified = {}
         self.history = []
         self.n_verify = 0
+        self.n_decisions = 0
+        self.n_sensitive = 0        # decisions where the best station depends on the explanation (D_t > 0)
+        self.verify_log = []
 
     def _b(self, j):
         if j not in self.beliefs:
@@ -204,29 +217,52 @@ class Reasoning(Base):
                 row["network|compromised"] = round(self.net.p_compromised(), 4)
             self.history.append(row)
 
-    def on_observation(self, j, rep, obs, extreme, now):
+    def on_observation(self, j, rep, obs, extreme, now, verified=False):
         if self.network:
-            self.net.observe_arrival(j, rep, obs, extreme)
+            if verified:
+                self.net.observe_verification(j, rep, obs)
+            else:
+                self.net.observe_arrival(j, rep, obs, extreme)
+        elif verified:
+            self._b(j).observe_verification(rep, obs)
         else:
             self._b(j).observe_arrival(rep, obs, extreme)
 
+    def _own_wait(self, st, working):
+        """Wait from the fleet's own count if `working` plugs work (0 = drive on elsewhere)."""
+        if working == 0:
+            return self.reroute_min
+        a = working - 0.5 - st["fleet_charging"] - st["fleet_queued"] - st["enroute"]
+        return wait_minutes(a, working, self.session_min)
+
     def _waits(self, j, st):
         w_rep = wait_minutes(self.reported_avail(j, st), self.plugs, self.session_min)
-        w_own = wait_minutes(self.own_avail(st), self.plugs, self.session_min) + self.up
-        return {"N": w_rep, "C": w_rep + self.cm, "F": w_own, "A": w_own}
+        w_own = self._own_wait(st, self.plugs) + self.up
+        if self.capacity_risk:
+            # F: the report is stale *and* the equipment may be (partly) down:
+            # with probability p_cap_loss some plugs are broken (any number, equally likely)
+            broken = sum(self._own_wait(st, m) for m in range(self.plugs)) / self.plugs
+            w_f = (1 - self.p_cap_loss) * self._own_wait(st, self.plugs) + self.p_cap_loss * broken + self.up
+        else:
+            w_f = w_own
+        return {"N": w_rep, "C": w_rep + self.cm, "F": w_f, "A": w_own}
 
     def _cost(self, j, st, taxi, cap):
         b = self._b(j)
         w = self._waits(j, st)
-        worst = max(w.values())
-        exp_w = worst if b.inadequate(self.inad_thr) else sum(b.b[k] * w[k] for k in HYPS)
+        bb = b.b
+        exp_w = sum(bb[k] * w[k] for k in HYPS)
+        spread = math.sqrt(max(0.0, sum(bb[k] * (w[k] - exp_w) ** 2 for k in HYPS)))
+        if b.inadequate(self.inad_thr):
+            exp_w, spread = max(w.values()), 0.0
         lam = self.risk_low if taxi["soc_frac"] < self.low_soc else self.risk_high
-        c = self.travel_min(taxi["xy"], st) + exp_w + lam * (worst - exp_w)
+        c = self.travel_min(taxi["xy"], st) + exp_w + lam * spread
         if b.reliable() < 0.5 and st["enroute"] >= self.hedge_cap:
             c += 1e3
         return c, w
 
     def decide(self, taxi, stations, now):
+        self.n_decisions += 1
         costs, waits = {}, {}
         for j, st in stations.items():
             costs[j], waits[j] = self._cost(j, st, taxi, self.hedge_cap)
@@ -253,6 +289,99 @@ class Reasoning(Base):
         if self.network and self.net is not None:
             d["network"] = {"P_compromised": round(self.net.p_compromised(), 3)}
         return d
+
+
+class ReasoningEVSI(Reasoning):
+    """Decision-aware verification.
+
+    A check of station j returns an imperfect observation Y of j's discrepancy
+    (right with probability q, otherwise uninformative; hypotheses.verify_likelihood).
+    With L(a, k) the risk-neutral cost of choosing station a if j's explanation is k,
+
+        EVSI_j = min_a sum_k b_j(k) L(a, k)
+                 - sum_y P(y) min_a sum_k b_j(k | y) L(a, k)
+
+    is the expected saving for this taxi. The answer is shared: every taxi that
+    makes a charging decision before the next check of j may use it. With r the
+    fleet's recent rate of charging decisions (per minute) and tau the lifetime
+    of the answer (= the minimum time between two checks of the same station),
+
+        value_j = EVSI_j * (1 + r * tau).
+
+    The fleet checks the station with the largest value_j if it exceeds the
+    cost (the taxi waits `verify_min` minutes).
+
+    Decision sensitivity (logged, and used as a quick filter):
+        D_j = 1 - max_a sum_k b_j(k) 1[a = a*(k)],   a*(k) = argmin_a L(a, k).
+    D_j = 0 means every explanation of station j leads to the same choice, so
+    checking j cannot change the decision (EVSI_j = 0) and is skipped.
+    """
+    name = "Reasoning+EVSI"
+
+    share = True
+
+    def __init__(self, plugs, info_lifetime_min=15.0, rate_window_s=1800, **kw):
+        kw.setdefault("verify_cooldown_s", int(info_lifetime_min * 60))
+        super().__init__(plugs, **kw)
+        self.tau = info_lifetime_min
+        self.rate_window = rate_window_s
+        self.decision_times = []
+
+    def _evsi(self, j, stations, taxi, waits):
+        b = self._b(j).b
+        exp_cost = {}
+        for a, st in stations.items():
+            ba = self._b(a).b
+            exp_cost[a] = self.travel_min(taxi["xy"], st) + sum(ba[k] * waits[a][k] for k in HYPS)
+        tj = self.travel_min(taxi["xy"], stations[j])
+
+        def L(a, k):
+            return tj + waits[j][k] if a == j else exp_cost[a]
+        acts = list(stations)
+        best_per_k = {k: min(acts, key=lambda a: L(a, k)) for k in HYPS}
+        D = 1 - max(sum(b[k] for k in HYPS if best_per_k[k] == a) for a in acts)
+        if D <= 1e-9:
+            return 0.0, 0.0
+        now_best = min(sum(b[k] * L(a, k) for k in HYPS) for a in acts)
+        after = 0.0
+        for y in range(3):
+            lik = verify_likelihood(y)
+            py = sum(lik[k] * b[k] for k in HYPS)
+            post = {k: lik[k] * b[k] / py for k in HYPS}
+            after += py * min(sum(post[k] * L(a, k) for k in HYPS) for a in acts)
+        return max(0.0, now_best - after), D
+
+    def decide(self, taxi, stations, now):
+        self.n_decisions += 1
+        self.decision_times = [t for t in self.decision_times if now - t <= self.rate_window] + [now]
+        rate = len(self.decision_times) / (self.rate_window / 60.0)
+        costs, waits = {}, {}
+        for j, st in stations.items():
+            costs[j], waits[j] = self._cost(j, st, taxi, self.hedge_cap)
+        best = min(costs, key=costs.get)
+        cand, sensitive = [], False
+        for j in stations:
+            evsi, D = self._evsi(j, stations, taxi, waits)
+            sensitive = sensitive or D > 0
+            if now - self.last_verified.get(j, -1e9) >= self.cooldown:
+                mult = (1 + rate * self.tau) if self.share else 1.0
+                cand.append((evsi * mult, evsi, D, j))
+        self.n_sensitive += sensitive
+        if cand:
+            value, evsi, D, j = max(cand)
+            if value > self.verify_min:
+                self.last_verified[j] = now
+                self.n_verify += 1
+                self.verify_log.append(dict(t=now, station=j, evsi=round(evsi, 2), value=round(value, 2),
+                                            D=round(D, 3), **{k: round(self._b(j).b[k], 3) for k in HYPS}))
+                return ("verify", j)
+        return ("go", best)
+
+
+class ReasoningEVSISolo(ReasoningEVSI):
+    """Ablation: EVSI counted for the deciding taxi only (the answer is not shared)."""
+    name = "Reasoning+EVSI-solo"
+    share = False
 
 
 class ReasoningIndep(Reasoning):
@@ -290,7 +419,7 @@ class CusumPlus(Reasoning):
     def on_minute(self, now, reports):
         Base.on_minute(self, now, reports)
 
-    def on_observation(self, j, rep, obs, extreme, now):
+    def on_observation(self, j, rep, obs, extreme, now, verified=False):
         self.cusum.on_observation(j, rep, obs, extreme, now)
         if self.alarm_time is None and self.cusum.alarm_time is not None:
             self.alarm_time = self.cusum.alarm_time
@@ -302,4 +431,4 @@ class CusumPlus(Reasoning):
         return {}
 
 
-CONTROLLERS = {c.name: c for c in (TrustAll, Threshold, Cusum, CusumPlus, ReasoningIndep, Reasoning)}
+CONTROLLERS = {c.name: c for c in (TrustAll, Threshold, Cusum, CusumPlus, ReasoningIndep, Reasoning, ReasoningEVSI, ReasoningEVSISolo)}

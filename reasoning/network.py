@@ -28,7 +28,7 @@ import math
 
 import numpy as np
 
-from .hypotheses import HYPS, PRIOR, STAY, arrival_likelihood, stream_likelihood
+from .hypotheses import HYPS, PRIOR, STAY, arrival_likelihood, disc_bin, stream_likelihood, verify_likelihood
 
 A = HYPS.index("A")
 
@@ -103,6 +103,9 @@ class NetworkBelief:
 
     def observe_stream(self, station, changed, jammed=False):
         return self._update(station, stream_likelihood(changed, jammed))
+
+    def observe_verification(self, station, reported_avail, observed_avail):
+        return self._update(station, verify_likelihood(disc_bin(reported_avail - observed_avail)))
 
     def marginal(self, station):
         j = self.idx[station]

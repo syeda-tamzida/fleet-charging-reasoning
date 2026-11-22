@@ -1,0 +1,61 @@
+{
+ "P_DISC": {
+  "N": [
+   0.98,
+   0.01,
+   0.01
+  ],
+  "C": [
+   0.9,
+   0.075,
+   0.025
+  ],
+  "F": [
+   0.617,
+   0.233,
+   0.15
+  ],
+  "A": [
+   0.17,
+   0.089,
+   0.741
+  ]
+ },
+ "P_EXTREME": {
+  "N": 0.287,
+  "C": 0.05,
+  "F": 0.1,
+  "A": 0.991
+ },
+ "P_JAMMED": {
+  "N": 0.01,
+  "C": 0.01,
+  "F": 0.01,
+  "A": 0.596
+ },
+ "P_CHANGED": {
+  "N": 0.66,
+  "C": 0.596,
+  "F": 0.01,
+  "A": 0.01
+ },
+ "n": {
+  "N": {
+   "arrivals": 77,
+   "report_checks": 144
+  },
+  "C": {
+   "arrivals": 5,
+   "report_checks": 24
+  },
+  "F": {
+   "arrivals": 10,
+   "report_checks": 24
+  },
+  "A": {
+   "arrivals": 51,
+   "report_checks": 120
+  }
+ },
+ "note": "fitted by experiments/calibrate.py on seeds 101-102 of normal, congestion, fault, attack, local_attack; shrinkage M=5.0 towards the hand-set values, floor 0.01"
+}
