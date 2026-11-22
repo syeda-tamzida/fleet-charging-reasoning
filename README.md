@@ -72,7 +72,9 @@ All code for the method is in [`reasoning/`](reasoning/) and does not depend on 
 over the network state and every station's explanation, $b(G, H_1, \dots, H_J)$
 (2 × 4⁴ = 512 states for 4 stations):
 
-$$b_t(G, H) \propto P(o_t \mid H)\sum_{G', H'} P(G \mid G')\prod_j P(H_j \mid H'_j, G)\; b_{t-1}(G', H')$$
+```math
+b_t(G, H) \propto P(o_t \mid H)\sum_{G', H'} P(G \mid G')\prod_j P(H_j \mid H'_j, G)\; b_{t-1}(G', H')
+```
 
 Evidence at one station changes the belief about $G$, and through $G$ about every other station.
 
@@ -104,17 +106,21 @@ to a probably unreliable station; conservative waits if no explanation fits (hig
 
 **5. Decision-aware verification (`Reasoning+EVSI`).** A check of station $j$ (a call, a camera,
 a fleet vehicle nearby) returns an *imperfect* observation $Y$: right with probability 0.8,
-otherwise uninformative, so $P(Y=y \mid k) = 0.8\,P(D=y \mid k) + 0.2/3$. With $L(a,k)$ the cost of
+otherwise uninformative, so $P(Y=y \mid k) = 0.8 \cdot P(D=y \mid k) + 0.2/3$. With $L(a,k)$ the cost of
 choosing station $a$ if $j$'s explanation is $k$:
 
-$$\mathrm{EVSI}_j = \min_a \sum_k b_j(k)L(a,k) \;-\; \sum_y P(y)\,\min_a \sum_k b_j(k\mid y)\,L(a,k)$$
+```math
+\mathrm{EVSI}_j = \min_a \sum_k b_j(k)L(a,k) \;-\; \sum_y P(y)\,\min_a \sum_k b_j(k\mid y)\,L(a,k)
+```
 
 The answer is a shared good: every taxi that decides before the next check of $j$ can use it. With
 $r$ the fleet's recent rate of charging decisions and $\tau = 15$ min the lifetime of an answer,
 the fleet checks the station with the largest $\mathrm{EVSI}_j(1 + r\tau)$ if it exceeds the cost of
 the check (the taxi waits $c$ minutes). The **decision sensitivity**
 
-$$D_j = 1 - \max_a \sum_k b_j(k)\,\mathbb{1}[a = a^*(k)], \qquad a^*(k) = \arg\min_a L(a,k)$$
+```math
+D_j = 1 - \max_a \sum_k b_j(k)\,\mathbb{1}[a = a^{\ast}(k)], \qquad a^{\ast}(k) = \arg\min_a L(a,k)
+```
 
 is 0 when every explanation leads to the same choice; then checking cannot change the decision
 and is skipped. `Reasoning+EVSI-solo` (ablation) counts EVSI for the deciding taxi only, i.e.
