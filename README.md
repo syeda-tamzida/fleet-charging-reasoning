@@ -219,4 +219,12 @@ results/          summaries, belief traces, time series, figures; old_v1 = first
 The per-run logs (summaries, belief traces, time series for all 150 runs) are packed in
 `results/runs.zip`. Unzip it inside `results/` before running `summarize.py` or `make_figures.py`.
 
+## Acknowledgement
+
+METS-R and Prof. Ukkusuri's UMNI Lab: the project builds on their charging-security demos, followed by the full METS-R paper citation.
+SUMO: the simulator all experiments ran in.
+OpenStreetMap: the source of the Pittsburgh road map. The copyright line is kept, because the map's license requires it.
+AI assistance: the code was written with Claude's help, and the research question and choices were yours.
+
+
 
