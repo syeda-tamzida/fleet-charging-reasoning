@@ -1,0 +1,4 @@
+eclipse-sumo>=1.20
+pandas
+matplotlib
+tabulate
