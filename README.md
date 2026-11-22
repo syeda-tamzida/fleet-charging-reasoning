@@ -219,8 +219,4 @@ results/          summaries, belief traces, time series, figures; old_v1 = first
 The per-run logs (summaries, belief traces, time series for all 150 runs) are packed in
 `results/runs.zip`. Unzip it inside `results/` before running `summarize.py` or `make_figures.py`.
 
-## Acknowledgment
 
-Implemented with the help of an AI coding assistant (Claude). The research question, framing and
-choices of what to test are mine; all results come from the code in this repository and can be
-reproduced with the commands above.
