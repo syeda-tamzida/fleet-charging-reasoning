@@ -1,0 +1,17 @@
+scenario,controller,runs,mean_wait_min,p90_wait_min,taxi_h_queued,taxi_h_verifying,served_pct,attack_alarms,alarm_delay_min,verifications,Strip_diagnosis (Reasoning)
+normal,TrustAll,3,3.16,6.75,0.0,0.0,95.6,0/3,,0.0,
+normal,Threshold,3,3.16,6.75,0.0,0.0,95.6,0/3,,0.0,
+normal,CUSUM,3,3.16,6.75,0.0,0.0,95.6,0/3,,0.0,
+normal,Reasoning,3,3.1,6.36,0.06,0.0,95.7,0/3,,0.0,"N, N, N"
+congestion,TrustAll,3,3.17,6.63,1.65,0.0,95.8,0/3,,0.0,
+congestion,Threshold,3,3.17,6.63,1.65,0.0,95.8,0/3,,0.0,
+congestion,CUSUM,3,3.17,6.63,1.65,0.0,95.8,0/3,,0.0,
+congestion,Reasoning,3,3.09,6.38,2.94,0.0,95.8,0/3,,0.0,"N, N, N"
+fault,TrustAll,3,3.15,6.52,0.0,0.0,95.9,0/3,,0.0,
+fault,Threshold,3,3.15,6.52,0.0,0.0,95.9,0/3,,0.0,
+fault,CUSUM,3,3.15,6.52,0.0,0.0,95.9,0/3,,0.0,
+fault,Reasoning,3,3.18,6.76,0.14,0.0,95.6,0/3,,0.0,"F, F, F"
+attack,TrustAll,3,3.96,8.48,10.66,0.0,95.6,0/3,,0.0,
+attack,Threshold,3,3.15,6.53,1.43,0.0,96.0,3/3,18.7,0.0,
+attack,CUSUM,3,3.12,6.53,0.33,0.0,95.9,3/3,15.4,0.0,
+attack,Reasoning,3,3.15,6.44,1.04,0.13,95.8,3/3,14.0,4.0,"A, A, A"

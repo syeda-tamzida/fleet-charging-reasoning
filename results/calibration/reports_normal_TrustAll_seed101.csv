@@ -1,0 +1,97 @@
+t,station,free,queue
+0,Strip District,3,0
+0,Oakland,3,0
+0,Bloomfield,3,0
+0,Lawrenceville,2,0
+600,Strip District,0,0
+600,Oakland,0,0
+600,Bloomfield,1,0
+600,Lawrenceville,0,0
+1200,Strip District,0,1
+1200,Oakland,0,0
+1200,Bloomfield,0,0
+1200,Lawrenceville,1,0
+1800,Strip District,1,0
+1800,Oakland,3,0
+1800,Bloomfield,1,0
+1800,Lawrenceville,1,0
+2400,Strip District,1,0
+2400,Oakland,2,0
+2400,Bloomfield,2,0
+2400,Lawrenceville,0,0
+3000,Strip District,1,0
+3000,Oakland,0,0
+3000,Bloomfield,3,0
+3000,Lawrenceville,2,0
+3600,Strip District,0,0
+3600,Oakland,0,0
+3600,Bloomfield,1,0
+3600,Lawrenceville,1,0
+4200,Strip District,1,0
+4200,Oakland,1,0
+4200,Bloomfield,1,0
+4200,Lawrenceville,1,0
+4800,Strip District,3,0
+4800,Oakland,3,0
+4800,Bloomfield,2,0
+4800,Lawrenceville,2,0
+5400,Strip District,3,0
+5400,Oakland,3,0
+5400,Bloomfield,2,0
+5400,Lawrenceville,2,0
+6000,Strip District,3,0
+6000,Oakland,2,0
+6000,Bloomfield,2,0
+6000,Lawrenceville,2,0
+6600,Strip District,2,0
+6600,Oakland,2,0
+6600,Bloomfield,2,0
+6600,Lawrenceville,2,0
+7200,Strip District,3,0
+7200,Oakland,1,0
+7200,Bloomfield,1,0
+7200,Lawrenceville,1,0
+7800,Strip District,2,0
+7800,Oakland,1,0
+7800,Bloomfield,2,0
+7800,Lawrenceville,1,0
+8400,Strip District,1,0
+8400,Oakland,3,0
+8400,Bloomfield,3,0
+8400,Lawrenceville,3,0
+9000,Strip District,1,0
+9000,Oakland,2,0
+9000,Bloomfield,2,0
+9000,Lawrenceville,3,0
+9600,Strip District,2,0
+9600,Oakland,2,0
+9600,Bloomfield,2,0
+9600,Lawrenceville,3,0
+10200,Strip District,1,0
+10200,Oakland,3,0
+10200,Bloomfield,2,0
+10200,Lawrenceville,2,0
+10800,Strip District,1,0
+10800,Oakland,3,0
+10800,Bloomfield,1,0
+10800,Lawrenceville,3,0
+11400,Strip District,3,0
+11400,Oakland,3,0
+11400,Bloomfield,3,0
+11400,Lawrenceville,3,0
+12000,Strip District,3,0
+12000,Oakland,2,0
+12000,Bloomfield,2,0
+12000,Lawrenceville,3,0
+12600,Strip District,3,0
+12600,Oakland,2,0
+12600,Bloomfield,3,0
+12600,Lawrenceville,2,0
+13200,Strip District,3,0
+13200,Oakland,3,0
+13200,Bloomfield,3,0
+13200,Lawrenceville,2,0
+13800,Strip District,2,0
+13800,Oakland,3,0
+13800,Bloomfield,2,0
+13800,Lawrenceville,3,0

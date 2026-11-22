@@ -1,0 +1,17 @@
+{
+ "scenario": "normal",
+ "controller": "TrustAll",
+ "seed": 101,
+ "requests": 472,
+ "served_pct": 96.4,
+ "mean_wait_min": 3.17,
+ "p90_wait_min": 6.52,
+ "taxi_hours_queued": 0.25,
+ "taxi_hours_verifying": 0.0,
+ "max_queue_target": 1,
+ "stranded": 0,
+ "attack_alarm": false,
+ "alarm_min_after_event": null,
+ "verifications": 0,
+ "final_belief": {}
+}
